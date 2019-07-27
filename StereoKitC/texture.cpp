@@ -9,6 +9,50 @@
 tex2d_t tex2d_create(const char *name) {
 	return (tex2d_t)assets_allocate(asset_type_texture, name);
 }
+tex2d_t tex2d_create_cubemap(const char *id, const char **files) {
+	tex2d_t result = (tex2d_t)assets_find(files[0]);
+	if (result != nullptr) {
+		assets_addref(result->header);
+		return result;
+	}
+
+	// Load all 6 faces
+	uint8_t *data[6] = {};
+	int  final_width  = 0;
+	int  final_height = 0;
+	bool loaded       = true;
+	for (size_t i = 0; i < 6; i++) {
+		int channels = 0;
+		int width    = 0;
+		int height   = 0;
+		data[i] = stbi_load(files[i], &width, &height, &channels, 4);
+
+		// Check if there were issues, or one of the images is the wrong size!
+		if (data == nullptr || 
+			(final_width  != 0 && final_width  != width ) ||
+			(final_height != 0 && final_height != height)) {
+			loaded = false;
+			break;
+		}
+		final_width  = width;
+		final_height = height;
+	}
+
+	// free memory if we failed
+	if (!loaded) {
+		for (size_t i = 0; i < 6; i++) {
+			if (data[i] != nullptr)
+				free(data[i]);
+		}
+		return nullptr;
+	}
+
+	// Create with the data we have
+	result = tex2d_create(id);
+	tex2d_set_colors_cube(result, final_width, final_height, &data[0]);
+
+	return result;
+}
 tex2d_t tex2d_create_file(const char *file) {
 	tex2d_t result = (tex2d_t)assets_find(file);
 	if (result != nullptr) {
@@ -117,6 +161,43 @@ void tex2d_set_colors(tex2d_t texture, int width, int height, uint8_t *data_rgba
 		src_line  += width * sizeof(uint8_t) * 4;
 	}
 	d3d_context->Unmap(texture->texture, 0);
+}
+
+void tex2d_set_colors_cube(tex2d_t texture, int width, int height, uint8_t **data_faces_rgba32) {
+	if (texture->resource != nullptr)
+		texture->resource->Release();
+	D3D11_TEXTURE2D_DESC desc = {};
+	desc.Width            = width;
+	desc.Height           = height;
+	desc.MipLevels        = 1;
+	desc.ArraySize        = 6;
+	desc.SampleDesc.Count = 1;
+	desc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.BindFlags        = D3D11_BIND_SHADER_RESOURCE;
+	desc.Usage            = D3D11_USAGE_DEFAULT;
+	desc.CPUAccessFlags   = 0;
+	desc.MiscFlags        = D3D11_RESOURCE_MISC_TEXTURECUBE;
+	
+	D3D11_SUBRESOURCE_DATA data[6];
+	for (size_t i = 0; i < 6; i++) {
+		data[i].pSysMem     = data_faces_rgba32[i];
+		data[i].SysMemPitch = sizeof(uint8_t) * 4 * width;
+		data[i].SysMemSlicePitch = 0;
+	}
+	
+	if (FAILED(d3d_device->CreateTexture2D(&desc, &data[0], &texture->texture))) {
+		printf("Create cubemap error!\n");
+		return;
+	}
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC res_desc = {};
+	res_desc.Format              = desc.Format;
+	res_desc.Texture2D.MipLevels = desc.MipLevels;
+	res_desc.ViewDimension       = D3D11_SRV_DIMENSION_TEXTURECUBE;
+	d3d_device->CreateShaderResourceView(texture->texture, &res_desc, &texture->resource);
+
+	texture->width  = width;
+	texture->height = height;
 }
 
 void tex2d_set_active(tex2d_t texture, int slot) {

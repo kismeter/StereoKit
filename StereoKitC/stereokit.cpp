@@ -24,6 +24,7 @@ long long sk_timev_raw = 0;
 tex2d_t    sk_default_tex;
 shader_t   sk_default_shader;
 material_t sk_default_material;
+tex2d_t    sk_default_cubemap;
 void sk_create_defaults();
 void sk_destroy_defaults();
 
@@ -102,6 +103,16 @@ void sk_create_defaults() {
 	uint8_t tex_colors[4 * 4];
 	memset(tex_colors, 255, sizeof(uint8_t) * 4 * 4);
 	tex2d_set_colors(sk_default_tex, 2, 2, tex_colors);
+
+	const char *maps[] = {
+		"Assets/Sky/Right.jpg",
+		"Assets/Sky/Left.jpg",
+		"Assets/Sky/Top.jpg",
+		"Assets/Sky/Bottom.jpg",
+		"Assets/Sky/Back.jpg",
+		"Assets/Sky/Front.jpg",
+	};
+	sk_default_cubemap = tex2d_create_cubemap("default/cubemap", maps);
 
 	sk_default_shader = shader_create("default/shader", R"_(cbuffer GlobalBuffer : register(b0) {
 	float4x4 view;

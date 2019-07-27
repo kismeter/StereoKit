@@ -123,10 +123,12 @@ SK_API void   mesh_set_inds (mesh_t mesh, uint16_t *indices,  int index_count);
 
 SK_DeclarePrivateType(tex2d_t);
 
-SK_API tex2d_t tex2d_create     (const char *name);
-SK_API tex2d_t tex2d_create_file(const char *file);
+SK_API tex2d_t tex2d_create        (const char *name);
+SK_API tex2d_t tex2d_create_cubemap(const char *id, const char **files); // x+, x-, y+, y-, z+, z-
+SK_API tex2d_t tex2d_create_file   (const char *file);
 SK_API void    tex2d_release    (tex2d_t texture);
 SK_API void    tex2d_set_colors (tex2d_t texture, int width, int height, uint8_t *data_rgba32);
+SK_API void    tex2d_set_colors_cube(tex2d_t texture, int width, int height, uint8_t **data_faces_rgba32); // x+, x-, y+, y-, z+, z-
 
 ///////////////////////////////////////////
 
@@ -193,6 +195,7 @@ SK_API void camera_proj      (camera_t    &cam, DirectX::XMMATRIX &result);
 
 SK_API void render_set_camera (camera_t &cam, transform_t &cam_transform);
 SK_API void render_set_light  (const vec3 &direction, float intensity, const color128 &color);
+SK_API void render_set_envcube(tex2d_t cubemap);
 SK_API void render_add_mesh   (mesh_t mesh, material_t material, transform_t &transform);
 SK_API void render_add_model  (model_t model, transform_t &transform);
 

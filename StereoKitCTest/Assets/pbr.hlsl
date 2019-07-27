@@ -44,6 +44,8 @@ SamplerState tex_e_sampler;
 Texture2D tex_metal : register(t2);
 SamplerState tex_metal_sampler;
 
+TextureCube  sk_cubemap : register(t6);
+
 float DistributionGGX(float3 normal, float3 half_vec, float roughness);
 float GeometrySchlickGGX(float NdotV, float roughness);
 float GeometrySmith(float NdotL, float NdotV, float roughness);
@@ -75,10 +77,15 @@ float4 ps(psIn input) : SV_TARGET {
     float  NdotL    = (dot(normal,light));
     float  NdotV    = (dot(normal,view));
 
+    float3 reflection = reflect(-view, normal);
+    float3 reflection_color = sk_cubemap.Sample(tex_sampler, reflection).rgb;
+    return float4(reflection_color, 1);
+
     // Lighting an object is a combination of two types of light reflections,
     // a diffuse reflection, and a specular reflection. These reflections
     // are approximated using functions called BRDFs (Bidirectional Reflectance
     // Distribuition Function).
+    // https://learnopengl.com/PBR/Lighting
     
     // For the diffuse BRDF, we'll use Lambert's, since it's simple, effective,
     // and research has said you can't do much better for cheap!

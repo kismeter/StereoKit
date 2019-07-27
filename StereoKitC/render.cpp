@@ -1,6 +1,7 @@
 #include "stereokit.h"
 #include "render.h"
 
+#include "assets.h"
 #include "mesh.h"
 #include "texture.h"
 #include "shader.h"
@@ -38,6 +39,7 @@ transform_t           *render_camera_transform = nullptr;
 camera_t              *render_camera = nullptr;
 transform_t            render_default_camera_tr;
 camera_t               render_default_camera;
+tex2d_t                render_cubemap;
 render_global_buffer_t render_global_buffer;
 
 void render_set_camera(camera_t &cam, transform_t &cam_transform) {
@@ -47,6 +49,9 @@ void render_set_camera(camera_t &cam, transform_t &cam_transform) {
 void render_set_light(const vec3 &direction, float intensity, const color128 &color) {
 	render_global_buffer.light       = { direction.x, direction.y, direction.z, intensity };
 	render_global_buffer.light_color = color;
+}
+void render_set_envcube(tex2d_t cubemap) {
+	render_cubemap = cubemap;
 }
 
 void render_add_mesh(mesh_t mesh, material_t material, transform_t &transform) {
@@ -84,6 +89,8 @@ void render_draw_queue(XMMATRIX view, XMMATRIX projection) {
 	render_global_buffer.view = XMMatrixTranspose(view);
 	render_global_buffer.proj = XMMatrixTranspose(projection);
 	render_global_buffer.viewproj = XMMatrixTranspose(view * projection);
+
+	tex2d_set_active(render_cubemap, 6);
 
 	shaderargs_set_data  (render_shader_globals, &render_global_buffer);
 	shaderargs_set_active(render_shader_globals);
@@ -135,6 +142,8 @@ void render_initialize() {
 	vec3 dir = { 1,2,1 };
 	dir = vec3_normalize(dir);
 	render_set_light(dir, 1, { 1,1,1,1 });
+
+	render_set_envcube((tex2d_t)assets_find("default/cubemap"));
 }
 void render_shutdown() {
 	shaderargs_destroy(render_shader_transforms);
