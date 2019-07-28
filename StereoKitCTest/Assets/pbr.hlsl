@@ -78,8 +78,9 @@ float4 ps(psIn input) : SV_TARGET {
     float  NdotV    = (dot(normal,view));
 
     float3 reflection = reflect(-view, normal);
-    float3 reflection_color = sk_cubemap.Sample(tex_sampler, reflection).rgb;
-    return float4(reflection_color, 1);
+    float3 reflection_color = sk_cubemap.SampleLevel(tex_sampler, reflection, rough*8).rgb;
+    //return float4(reflection_color, 1);
+    float3 specular_color = lerp(albedo, reflection_color, metal);
 
     // Lighting an object is a combination of two types of light reflections,
     // a diffuse reflection, and a specular reflection. These reflections
@@ -120,7 +121,7 @@ float4 ps(psIn input) : SV_TARGET {
     // h is the half vector, h = normalize(l + v)
     float3 specular = 
         (DistributionGGX(normal, half_vec, rough) * 
-         FresnelSchlick (NdotV, albedo, metal) * 
+         FresnelSchlick (NdotV, specular_color, metal) * 
          GeometrySmith  (max(NdotL, 0), max(NdotV, 0), rough)) 
          //GeometrySchlickGGX(max(NdotV, 0), rough))
 

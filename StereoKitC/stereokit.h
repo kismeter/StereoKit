@@ -123,12 +123,12 @@ SK_API void   mesh_set_inds (mesh_t mesh, uint16_t *indices,  int index_count);
 
 SK_DeclarePrivateType(tex2d_t);
 
-SK_API tex2d_t tex2d_create        (const char *name);
-SK_API tex2d_t tex2d_create_cubemap(const char *id, const char **files); // x+, x-, y+, y-, z+, z-
-SK_API tex2d_t tex2d_create_file   (const char *file);
-SK_API void    tex2d_release    (tex2d_t texture);
-SK_API void    tex2d_set_colors (tex2d_t texture, int width, int height, uint8_t *data_rgba32);
-SK_API void    tex2d_set_colors_cube(tex2d_t texture, int width, int height, uint8_t **data_faces_rgba32); // x+, x-, y+, y-, z+, z-
+SK_API tex2d_t tex2d_create         (const char *name);
+SK_API tex2d_t tex2d_create_cubemap (const char *id, const char **files, int make_mip_maps = true); // x+, x-, y+, y-, z+, z-
+SK_API tex2d_t tex2d_create_file    (const char *file,                   int make_mip_maps = true);
+SK_API void    tex2d_release        (tex2d_t texture);
+SK_API void    tex2d_set_colors     (tex2d_t texture, int width, int height, uint8_t *data_rgba32,        int make_mip_maps = true);
+SK_API void    tex2d_set_colors_cube(tex2d_t texture, int width, int height, uint8_t **data_faces_rgba32, int make_mip_maps = true); // x+, x-, y+, y-, z+, z-
 
 ///////////////////////////////////////////
 

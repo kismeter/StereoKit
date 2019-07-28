@@ -14,6 +14,6 @@ struct _tex2d_t {
 	ID3D11Texture2D          *texture;
 };
 
-tex2d_t tex2d_create_mem(const char *id, void *data, size_t data_size);
+tex2d_t tex2d_create_mem(const char *id, void *data, size_t data_size, int make_mip_maps = true);
 void    tex2d_set_active(tex2d_t texture, int slot);
 void    tex2d_destroy   (tex2d_t texture);
