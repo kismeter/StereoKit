@@ -377,7 +377,6 @@
     <ClCompile Include="model.cpp" />
     <ClCompile Include="openxr.cpp" />
     <ClCompile Include="render.cpp" />
-    <ClCompile Include="rendertarget.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="stereokit.cpp" />
     <ClCompile Include="stref.cpp" />
@@ -399,7 +398,9 @@
     <ClInclude Include="render.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="openxr.h" />
-    <ClInclude Include="rendertarget.h" />
+    <ClInclude Include="shader_builtin.h" />
+    <ClInclude Include="shader_builtin_default.h" />
+    <ClInclude Include="shader_builtin_pbr.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="stereokit.h" />
     <ClInclude Include="stref.h" />

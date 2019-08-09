@@ -29,6 +29,7 @@ void assets_unique_name(const char *root_name, char *dest, int dest_size) {
 	while (assets_find(dest) != nullptr) {
 		sprintf_s(dest, dest_size, "%s%d", root_name, count);
 		id = string_hash(dest);
+		count += 1;
 	}
 }
 
@@ -49,9 +50,10 @@ void *assets_allocate(asset_type_ type, const char *id) {
 
 	asset_header_t *header = (asset_header_t *)malloc(size);
 	memset(header, 0, size);
-	header->type = type;
+	header->type  = type;
 	header->refs += 1;
-	header->id   = string_hash(id);
+	header->id    = string_hash(id);
+	header->index = assets.size();
 	assets.push_back(header);
 	return header;
 }

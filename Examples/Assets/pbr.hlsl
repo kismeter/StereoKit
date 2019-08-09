@@ -8,14 +8,14 @@ cbuffer GlobalBuffer : register(b0) {
 	float4   sk_camera_dir;
 };
 cbuffer TransformBuffer : register(b1) {
-	float4x4 sk_world;
+	float4x4 sk_world[1000];
 };
 cbuffer ParamBuffer : register(b2) {
-	// [param] color color
+	// [param] color color default{1,1,1,1}
 	float4 _color;
-	// [param] float metallic
+	// [param] float metallic default 0
 	float metallic;
-	// [param] float roughness
+	// [param] float roughness default 0
 	float roughness;
 };
 struct vsIn {
@@ -32,23 +32,23 @@ struct psIn {
 	float3 world : TEXCOORD1;
 };
 
-// [texture] diffuse
+// [texture] diffuse white
 Texture2D tex : register(t0);
 SamplerState tex_sampler;
 
-// [texture] emission
+// [texture] emission black
 Texture2D tex_emission : register(t1);
 SamplerState tex_e_sampler;
 
-// [texture] metal
+// [texture] metal black
 Texture2D tex_metal : register(t2);
 SamplerState tex_metal_sampler;
 
-// [texture] normal
+// [texture] normal gray
 Texture2D tex_normal : register(t3);
 SamplerState tex_normal_sampler;
 
-// [texture] occlusion
+// [texture] occlusion white
 Texture2D tex_occ : register(t4);
 SamplerState tex_occ_sampler;
 
@@ -62,12 +62,12 @@ float GeometrySchlickGGX(float NdotV, float roughness);
 float GeometrySmith     (float NdotL, float NdotV, float roughness);
 float3 FresnelSchlick   (float NdotV, float3 surfaceColor, float metalness);
 
-psIn vs(vsIn input) {
+psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn output;
-	output.world = mul(float4(input.pos.xyz, 1), sk_world).xyz;
+	output.world = mul(float4(input.pos.xyz, 1), sk_world[id]).xyz;
 	output.pos   = mul(float4(output.world, 1), sk_viewproj);
 
-	output.normal = normalize(mul(float4(input.norm, 0), sk_world).xyz);
+	output.normal = normalize(mul(float4(input.norm, 0), sk_world[id]).xyz);
 	output.uv     = input.uv;
     output.color  = input.color;
 	return output;

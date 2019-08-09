@@ -29,6 +29,8 @@ struct shaderargs_desc_item_t {
 	size_t          offset;
 	size_t          size;
 	shaderarg_type_ type;
+	void           *default_value;
+	char           *tags;
 };
 
 struct shaderargs_desc_t {
@@ -40,6 +42,7 @@ struct shaderargs_desc_t {
 struct shader_tex_slots_item_t {
 	uint64_t id;
 	int      slot;
+	tex2d_t  default_tex;
 };
 
 struct shader_tex_slots_t {
@@ -57,10 +60,9 @@ struct _shader_t {
 	shader_tex_slots_t  tex_slots;
 };
 
-void shader_set_active(shader_t shader);
-void shader_destroy   (shader_t shader);
+void shader_destroy(shader_t shader);
 
 void shaderargs_create    (shaderargs_t &args, size_t buffer_size, int buffer_slot);
 void shaderargs_destroy   (shaderargs_t &args);
-void shaderargs_set_data  (shaderargs_t &args, void *data);
-void shaderargs_set_active(shaderargs_t &args);
+void shaderargs_set_data  (shaderargs_t &args, void *data, size_t buffer_size = 0);
+void shaderargs_set_active(shaderargs_t &args, bool include_ps = true);

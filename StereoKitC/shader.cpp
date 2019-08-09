@@ -42,27 +42,33 @@ void shader_parse_file(shader_t shader, const char *hlsl) {
 	vector<shaderargs_desc_item_t > buffer_items;
 	vector<shader_tex_slots_item_t> tex_items;
 
-	int buffer_size = 0;
+	size_t buffer_size = 0;
 	while (stref_nextline(file, line)) {
 		stref_t curr = line;
 		stref_t word = {};
 		stref_trim(curr);
 		
-		if (!stref_nextword(curr, word) || !stref_equals(word, "//"))
+		if (!stref_nextword(curr, word, ' ', '[', ']') || !stref_equals(word, "//"))
 			continue;
-		if (!stref_nextword(curr, word))
+		if (!stref_nextword(curr, word, ' ', '[', ']'))
 			continue;
-		if (stref_equals(word, "[param]")) {
+		if (stref_equals(stref_stripcapture(word,'[',']'), "param")) {
 			if (!stref_nextword(curr, word))
 				continue;
 
-			shaderargs_desc_item_t item;
+			shaderargs_desc_item_t item = {};
 			if      (stref_equals(word, "float" )) item.type = shaderarg_type_float;
-			else if (stref_equals(word, "color" )) item.type = shaderarg_type_color;
+			else if (stref_equals(word, "color" )) item.type = shaderarg_type_vector;
 			else if (stref_equals(word, "vector")) item.type = shaderarg_type_vector;
 			else if (stref_equals(word, "matrix")) item.type = shaderarg_type_matrix;
+			else {
+				char name[64];
+				stref_copy_to(word, name, 64);
+				log_writef(log_warning, "Unrecognized shader param type: %s", name);
+				free(name);
+			}
 			item.size   = shaderarg_size[item.type];
-		
+
 			// make sure parameters are padded so they don't overflow into the next register
 			if (buffer_size % shader_register_size != 0 && // if it's evenly aligned, it isn't a problem, but if it's not, we need to check!
 				buffer_size/shader_register_size != (buffer_size+item.size)/shader_register_size && // if we've crossed into the next register
@@ -78,13 +84,49 @@ void shader_parse_file(shader_t shader, const char *hlsl) {
 				item.id = stref_hash(word);
 			}
 
+			while (stref_nextword(curr, word, ' ', '{','}')) {
+				if (stref_equals(word, "default")) {
+					if (stref_nextword(curr, word, ' ','{', '}')) {
+						stref_t value = stref_stripcapture(word, '{', '}');
+						if (item.type == shaderarg_type_float) {
+							item.default_value = malloc(sizeof(float));
+							*(float *)item.default_value = stref_to_f(value);
+
+						} else if (item.type == shaderarg_type_vector) {
+							vec4    result    = {};
+							stref_t component = {};
+							if (stref_nextword(value, component, ',')) result.x = stref_to_f(component);
+							if (stref_nextword(value, component, ',')) result.y = stref_to_f(component);
+							if (stref_nextword(value, component, ',')) result.z = stref_to_f(component);
+							if (stref_nextword(value, component, ',')) result.w = stref_to_f(component);
+
+							item.default_value = malloc(sizeof(vec4));
+							*(vec4 *)item.default_value = result;
+						}
+					}
+				} else if (stref_equals(word, "tags")) {
+					if (stref_nextword(curr, word, ' ', '{','}'))
+						item.tags = stref_copy(stref_stripcapture(word, '{','}'));
+				}
+			}
+
 			buffer_items.emplace_back(item);
 		} else if (stref_equals(word, "[texture]")) {
 
 			shader_tex_slots_item_t item;
-			item.slot = tex_items.size();
+			item.slot = (int)tex_items.size();
 			if (stref_nextword(curr, word)) {
 				item.id = stref_hash(word);
+			}
+
+			// Find a default texture for this slot, in case it isn't used!
+			if (stref_nextword(curr, word)) {
+				if      (stref_equals(word, "white")) item.default_tex = tex2d_find("default/tex2d");
+				else if (stref_equals(word, "black")) item.default_tex = tex2d_find("default/tex2d_black");
+				else if (stref_equals(word, "gray" )) item.default_tex = tex2d_find("default/tex2d_gray");
+				else                                  item.default_tex = tex2d_find("default/tex2d");
+			} else {
+				item.default_tex = tex2d_find("default/tex2d");
 			}
 
 			tex_items.emplace_back(item);
@@ -97,10 +139,10 @@ void shader_parse_file(shader_t shader, const char *hlsl) {
 	}
 
 	shader->args_desc = {};
-	shader->args_desc.buffer_size = buffer_size;
+	shader->args_desc.buffer_size = (int)buffer_size;
 	size_t data_size = sizeof(shaderargs_desc_item_t) * buffer_items.size();
 	if (data_size > 0) {
-		shader->args_desc.item_count = buffer_items.size();
+		shader->args_desc.item_count = (int)buffer_items.size();
 		shader->args_desc.item       = (shaderargs_desc_item_t *)malloc(data_size);
 		memcpy(shader->args_desc.item, &buffer_items[0], data_size);
 	}
@@ -108,7 +150,7 @@ void shader_parse_file(shader_t shader, const char *hlsl) {
 	shader->tex_slots = {};
 	data_size = sizeof(shader_tex_slots_item_t) * tex_items.size();
 	if (data_size > 0) {
-		shader->tex_slots.tex_count = tex_items.size();
+		shader->tex_slots.tex_count = (int)tex_items.size();
 		shader->tex_slots.tex       = (shader_tex_slots_item_t*)malloc(data_size);
 		memcpy(shader->tex_slots.tex, &tex_items[0], data_size);
 	}
@@ -177,16 +219,21 @@ shader_t shader_create(const char *id, const char *hlsl) {
 	return result;
 }
 
-void shader_set_active(shader_t shader) {
-	d3d_context->VSSetShader(shader->vshader, nullptr, 0);
-	d3d_context->PSSetShader(shader->pshader, nullptr, 0);
-	d3d_context->IASetInputLayout(shader->vert_layout);
-}
-
 void shader_release(shader_t shader) {
 	assets_releaseref(shader->header);
 }
+
 void shader_destroy(shader_t shader) {
+	for (size_t i = 0; i < shader->tex_slots.tex_count; i++) {
+		tex2d_release(shader->tex_slots.tex[i].default_tex);
+	}
+	for (size_t i = 0; i < shader->args_desc.item_count; i++) {
+		if (shader->args_desc.item[i].tags != nullptr)
+			free(shader->args_desc.item[i].tags);
+		if (shader->args_desc.item[i].default_value != nullptr)
+			free(shader->args_desc.item[i].default_value);
+	}
+
 	shaderargs_destroy(shader->args);
 	if (shader->pshader     != nullptr) shader->pshader    ->Release();
 	if (shader->vshader     != nullptr) shader->vshader    ->Release();
@@ -197,22 +244,27 @@ void shader_destroy(shader_t shader) {
 }
 
 void shaderargs_create(shaderargs_t &args, size_t buffer_size, int buffer_slot) {
-	CD3D11_BUFFER_DESC const_buff_desc(buffer_size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE);
+	CD3D11_BUFFER_DESC const_buff_desc((UINT)buffer_size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE);
 	d3d_device->CreateBuffer(&const_buff_desc, nullptr, &args.const_buffer);
-	args.buffer_size = buffer_size;
+	args.buffer_size = (int)buffer_size;
 	args.buffer_slot = buffer_slot;
 }
-void shaderargs_set_data(shaderargs_t &args, void *data) {
+void shaderargs_set_data(shaderargs_t &args, void *data, size_t buffer_size) {
 	if (args.const_buffer == nullptr)
 		return;
+	assert(buffer_size <= args.buffer_size);
+	if (buffer_size == 0)
+		buffer_size = args.buffer_size;
+
 	D3D11_MAPPED_SUBRESOURCE res;
 	d3d_context->Map(args.const_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
-	memcpy(res.pData, data, args.buffer_size);
+	memcpy(res.pData, data, buffer_size);
 	d3d_context->Unmap( args.const_buffer, 0 );
 }
-void shaderargs_set_active(shaderargs_t &args) {
+void shaderargs_set_active(shaderargs_t &args, bool include_ps) {
 	d3d_context->VSSetConstantBuffers(args.buffer_slot, 1, &args.const_buffer);
-	d3d_context->PSSetConstantBuffers(args.buffer_slot, 1, &args.const_buffer);
+	if (include_ps)
+		d3d_context->PSSetConstantBuffers(args.buffer_slot, 1, &args.const_buffer);
 }
 void shaderargs_destroy(shaderargs_t &args) {
 	if (args.const_buffer != nullptr) args.const_buffer->Release();

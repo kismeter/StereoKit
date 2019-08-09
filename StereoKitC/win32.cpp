@@ -6,14 +6,14 @@
 
 #include "stereokit.h"
 
+#include "texture.h"
 #include "render.h"
-#include "rendertarget.h"
 #include "d3d.h"
 #include "input.h"
 #include "win32_input.h"
 
 HWND             win32_window    = nullptr;
-rendertarget_t   win32_target    = {};
+tex2d_t          win32_target    = {};
 IDXGISwapChain1 *win32_swapchain = {};
 float            win32_scroll    = 0;
 
@@ -22,14 +22,14 @@ void win32_resize(int width, int height) {
 		return;
 	d3d_screen_width  = width;
 	d3d_screen_height = height;
+	log_write(log_info, "Resize!");
 
 	if (win32_swapchain != nullptr) {
-		rendertarget_release(win32_target);
+		tex2d_releasesurface(win32_target);
 		win32_swapchain->ResizeBuffers(0, (UINT)d3d_screen_width, (UINT)d3d_screen_height, DXGI_FORMAT_UNKNOWN, 0);
 		ID3D11Texture2D *back_buffer;
 		win32_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-		rendertarget_set_surface(win32_target, back_buffer);
-		rendertarget_make_depthbuffer(win32_target);
+		tex2d_setsurface(win32_target, back_buffer);
 	}
 }
 
@@ -72,8 +72,10 @@ bool win32_init(const char *app_name) {
 	dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_window, &sd, nullptr, nullptr, &win32_swapchain);
 	ID3D11Texture2D *back_buffer;
 	win32_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
-	rendertarget_set_surface(win32_target, back_buffer);
-	rendertarget_make_depthbuffer(win32_target);
+
+	win32_target = tex2d_create("stereokit/system/rendertarget", tex_type_rendertarget);
+	tex2d_setsurface (win32_target, back_buffer);
+	tex2d_add_zbuffer(win32_target);
 
 	dxgi_factory->Release();
 	dxgi_adapter->Release();
@@ -85,7 +87,7 @@ bool win32_init(const char *app_name) {
 }
 void win32_shutdown() {
 	win32_input_shutdown();
-	rendertarget_release(win32_target);
+	tex2d_release(win32_target);
 	win32_swapchain->Release();
 }
 
@@ -99,13 +101,12 @@ void win32_step_begin() {
 }
 void win32_step_end() {
 	// Set up where on the render target we want to draw, the view has a 
-	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(0.f, 0.f, d3d_screen_width, d3d_screen_height);
+	D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(0.f, 0.f, (float)d3d_screen_width, (float)d3d_screen_height);
 	d3d_context->RSSetViewports(1, &viewport);
 
 	// Wipe our swapchain color and depth target clean, and then set them up for rendering!
-	float clear[] = { .4f, .4f, .45f, 1 };
-	rendertarget_clear(win32_target, clear);
-	rendertarget_set_active(win32_target);
+	tex2d_rtarget_clear(win32_target, {0,0,0,255});
+	tex2d_rtarget_set_active(win32_target);
 
 	render_draw();
 

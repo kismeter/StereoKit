@@ -114,8 +114,8 @@ static inline vec2  vec2_lerp        (const vec2 &a, const vec2 &b, float t) { r
 quat quat_lookat(const vec3 &from, const vec3 &at);
 quat quat_lerp(const quat &a, const quat &b, float t);
 
-#define deg2rad 0.01745329252
-#define rad2deg 57.295779513
+#define deg2rad 0.01745329252f
+#define rad2deg 57.295779513f
 
 ///////////////////////////////////////////
 
@@ -138,19 +138,47 @@ SK_API mesh_t mesh_gen_cube (const char *id, vec3 size, int32_t subdivisions);
 
 ///////////////////////////////////////////
 
+enum tex_type_ {
+	tex_type_image         = 1 << 0,
+	tex_type_cubemap       = 1 << 1,
+	tex_type_rendertarget  = 1 << 2,
+	tex_type_dynamic       = 1 << 3,
+	tex_type_depth         = 1 << 4,
+};
+SK_MakeFlag(tex_type_);
+
 enum tex_format_ {
 	tex_format_rgba32 = 0,
 	tex_format_rgba64,
 	tex_format_rgba128,
+	tex_format_depthstencil,
+	tex_format_depth32,
+	tex_format_depth16,
+};
+
+enum tex_sample_ {
+	tex_sample_linear = 0,
+	tex_sample_point,
+	tex_sample_anisotropic
+};
+
+enum tex_address_ {
+	tex_address_wrap = 0,
+	tex_address_clamp,
+	tex_address_mirror,
 };
 
 SK_DeclarePrivateType(tex2d_t);
 
 SK_API tex2d_t tex2d_find       (const char *id);
-SK_API tex2d_t tex2d_create     (const char *id);
+SK_API tex2d_t tex2d_create     (const char *id, tex_type_ type = tex_type_image, tex_format_ format = tex_format_rgba32);
 SK_API tex2d_t tex2d_create_file(const char *file);
 SK_API void    tex2d_release    (tex2d_t texture);
-SK_API void    tex2d_set_colors (tex2d_t texture, int32_t width, int32_t height, void *data, tex_format_ data_format = tex_format_rgba32);
+SK_API void    tex2d_set_colors (tex2d_t texture, int32_t width, int32_t height, void *data);
+SK_API void    tex2d_set_options(tex2d_t texture, tex_sample_ sample = tex_sample_linear, tex_address_ address_mode = tex_address_wrap, int32_t anisotropy_level = 4);
+SK_API void    tex2d_add_zbuffer(tex2d_t texture, tex_format_ format = tex_format_depthstencil);
+SK_API void    tex2d_rtarget_clear     (tex2d_t render_target, color32 color);
+SK_API void    tex2d_rtarget_set_active(tex2d_t render_target);
 
 ///////////////////////////////////////////
 
@@ -226,6 +254,7 @@ SK_API void render_set_camera (camera_t &cam, transform_t &cam_transform);
 SK_API void render_set_light  (const vec3 &direction, float intensity, const color128 &color);
 SK_API void render_add_mesh   (mesh_t mesh, material_t material, transform_t &transform);
 SK_API void render_add_model  (model_t model, transform_t &transform);
+SK_API void render_blit       (tex2d_t to_rendertarget, material_t material);
 
 ///////////////////////////////////////////
 
