@@ -1,22 +1,30 @@
 #include "stereokit.h"
+#include "_stereokit.h"
 
-#include "assets.h"
-#include "render.h"
-#include "d3d.h"
-#include "win32.h"
-#include "openxr.h"
-#include "input.h"
-#include "shader_builtin.h"
+#include "systems/render.h"
+#include "systems/d3d.h"
+#include "systems/input.h"
+#include "systems/physics.h"
+#include "systems/system.h"
+#include "systems/text.h"
+#include "systems/defaults.h"
+#include "systems/platform/platform.h"
 
 #include <thread> // sleep_for
 
 using namespace std;
 
-sk_runtime_ sk_runtime = sk_runtime_flatscreen;
-bool32_t sk_focused = true;
-bool32_t sk_run     = true;
+///////////////////////////////////////////
 
-bool sk_d3d_initialized = false;
+const char   *sk_app_name;
+void        (*sk_app_update_func)(void);
+sk_runtime_   sk_runtime  = sk_runtime_flatscreen;
+bool          sk_runtime_fallback = false;
+sk_settings_t sk_settings = {100,100,800,480};
+bool32_t      sk_focused = true;
+bool32_t      sk_run     = true;
+
+bool sk_initialized = false;
 
 float  sk_timevf = 0;
 double sk_timev  = 0;
@@ -25,69 +33,100 @@ double sk_timev_elapsed  = 0;
 float  sk_timev_elapsedf = 0;
 int64_t sk_timev_raw = 0;
 
-tex2d_t    sk_default_tex;
-tex2d_t    sk_default_tex_black;
-tex2d_t    sk_default_tex_gray;
-tex2d_t    sk_default_tex_flat;
-shader_t   sk_default_shader;
-shader_t   sk_default_shader_pbr;
-material_t sk_default_material;
-bool sk_create_defaults();
-void sk_destroy_defaults();
+///////////////////////////////////////////
+
+void sk_set_settings(sk_settings_t &settings) {
+	if (sk_initialized) {
+		log_write(log_error, "Settings need set before initialization! Please call this -before- sk_init.");
+		return;
+	}
+	sk_settings = settings;
+}
+
+///////////////////////////////////////////
+
+void sk_app_update() {
+	if (sk_app_update_func != nullptr)
+		sk_app_update_func();
+}
+
+///////////////////////////////////////////
 
 bool32_t sk_init(const char *app_name, sk_runtime_ runtime_preference, bool32_t fallback) {
-	// Test to avoid initializing the d3d context twice
-	if (!sk_d3d_initialized) {
-		if (d3d_init()) {
-			sk_d3d_initialized = true;
-		} else {
-			log_write(log_error, "Failed to init d3d!");
-			return false;
-		}
-		if (!sk_create_defaults()) {
-			log_write(log_error, "Failed to create defaults!");
-			return false;
-		}
-	}
+	sk_runtime          = runtime_preference;
+	sk_runtime_fallback = fallback;
+	sk_app_name         = app_name;
 
-	// Create a runtime
-	sk_runtime = runtime_preference;
-	bool result = sk_runtime == sk_runtime_mixedreality ? 
-		openxr_init(app_name) :
-		win32_init (app_name);
+	systems_add("Graphics", nullptr, 0, nullptr, 0, d3d_init, d3d_update, d3d_shutdown);
 
-	if (!result)
-		log_writef(log_warning, "Couldn't create StereoKit in %s mode!", sk_runtime == sk_runtime_mixedreality ? "MixedReality" : "Flatscreen");
+	const char *default_deps[] = {"Graphics"};
+	systems_add("Defaults", default_deps, _countof(default_deps), nullptr, 0, defaults_init, nullptr, defaults_shutdown);
 
-	// Try falling back to flatscreen, if we didn't just try it
-	if (!result && fallback && runtime_preference != sk_runtime_flatscreen) {
-		log_writef(log_info, "Runtime falling back to Flatscreen");
-		sk_runtime = sk_runtime_flatscreen;
-		result     = win32_init (app_name);
-	}
+	const char *platform_deps[] = {"Graphics", "Defaults"};
+	systems_add("Platform", platform_deps, _countof(platform_deps), nullptr, 0, platform_init, nullptr, platform_shutdown);
 
-	// No runtime, return failure
-	if (!result) {
-		log_write(log_error, "Couldn't create a StereoKit runtime!");
-		return false;
-	}
+	const char *physics_deps[] = {"Defaults"};
+	const char *physics_update_deps[] = {"Input", "FrameBegin"};
+	systems_add("Physics",  
+		physics_deps,        _countof(physics_deps), 
+		physics_update_deps, _countof(physics_update_deps), 
+		physics_init, physics_update, physics_shutdown);
 
-	render_initialize();
-	input_init();
-	return true;
+	const char *renderer_deps[] = {"Graphics", "Defaults"};
+	const char *renderer_update_deps[] = {"Physics", "FrameBegin"};
+	systems_add("Renderer",  
+		renderer_deps,        _countof(renderer_deps), 
+		renderer_update_deps, _countof(renderer_update_deps),
+		render_initialize, render_update, render_shutdown);
+
+	const char *input_deps[] = {"Platform", "Defaults"};
+	const char *input_update_deps[] = {"FrameBegin"};
+	systems_add("Input",  
+		input_deps,        _countof(input_deps), 
+		input_update_deps, _countof(input_update_deps), 
+		input_init, input_update, input_shutdown);
+
+	const char *text_deps[] = {"Defaults"};
+	const char *text_update_deps[] = {"FrameBegin", "App"};
+	systems_add("Text",  
+		text_deps,        _countof(text_deps), 
+		text_update_deps, _countof(text_update_deps), 
+		nullptr, text_update, text_shutdown);
+
+	const char *app_deps[] = {"Input", "Defaults", "FrameBegin", "Graphics", "Physics", "Renderer"};
+	systems_add("App", nullptr, 0, app_deps, _countof(app_deps), nullptr, sk_app_update, nullptr);
+
+	systems_add("FrameBegin", nullptr, 0, nullptr, 0, nullptr, platform_begin_frame, nullptr);
+	const char *platform_end_deps[] = {"App", "Text"};
+	systems_add("FrameRender",   nullptr, 0, platform_end_deps, _countof(platform_end_deps), nullptr, platform_end_frame,   nullptr);
+	const char *platform_present_deps[] = {"FrameRender"};
+	systems_add("FramePresent", nullptr, 0, platform_present_deps, _countof(platform_present_deps), nullptr, platform_present,   nullptr);
+
+	sk_initialized = systems_initialize();
+	return sk_initialized;
 }
+
+///////////////////////////////////////////
 
 void sk_shutdown() {
-	input_shutdown();
-	render_shutdown();
-	switch (sk_runtime) {
-	case sk_runtime_flatscreen:   win32_shutdown (); break;
-	case sk_runtime_mixedreality: openxr_shutdown(); break;
-	}
-	//assets_shutdown_check();
-	sk_destroy_defaults();
-	d3d_shutdown();
+	systems_shutdown();
+	sk_initialized = false;
 }
+
+///////////////////////////////////////////
+
+bool32_t sk_step(void (*app_update)(void)) {
+	sk_app_update_func = app_update;
+	sk_update_timer();
+
+	systems_update();
+
+	if (!sk_focused)
+		this_thread::sleep_for(chrono::milliseconds(sk_focused ? 1 : 250));
+	return sk_run;
+}
+
+///////////////////////////////////////////
 
 void sk_update_timer() {
 	FILETIME time;
@@ -104,97 +143,10 @@ void sk_update_timer() {
 	sk_timevf         = (float)sk_timev;
 }
 
-bool32_t sk_step(void (*app_update)(void)) {
-	switch (sk_runtime) {
-	case sk_runtime_flatscreen:   win32_step_begin (); break;
-	case sk_runtime_mixedreality: openxr_step_begin(); break;
-	}
-	
-	sk_update_timer();
-	input_update();
-
-	app_update();
-
-	d3d_render_begin();
-	switch (sk_runtime) {
-	case sk_runtime_flatscreen:   win32_step_end (); break;
-	case sk_runtime_mixedreality: openxr_step_end(); break;
-	}
-	d3d_render_end();
-
-	this_thread::sleep_for(chrono::milliseconds(sk_focused?1:250));
-
-	return sk_run;
-}
+///////////////////////////////////////////
 
 float  sk_timef        (){ return sk_timevf; };
 double sk_time         (){ return sk_timev; };
 float  sk_time_elapsedf(){ return sk_timev_elapsedf; };
 double sk_time_elapsed (){ return sk_timev_elapsed; };
 sk_runtime_ sk_active_runtime() { return sk_runtime;  }
-
-bool sk_create_defaults() {
-	// Default white texture
-	sk_default_tex = tex2d_create("default/tex2d");
-	if (sk_default_tex == nullptr) {
-		return false;
-	}
-	color32 tex_colors[2*2];
-	memset(tex_colors, 255, sizeof(color32) * 2 * 2);
-	tex2d_set_colors(sk_default_tex, 2, 2, tex_colors);
-
-	// Default black texture, for use with shader defaults
-	sk_default_tex_black = tex2d_create("default/tex2d_black");
-	if (sk_default_tex_black == nullptr) {
-		return false;
-	}
-	for (size_t i = 0; i < 2 * 2; i++) 
-		tex_colors[i] = { 0,0,0,255 };
-	tex2d_set_colors(sk_default_tex_black, 2, 2, tex_colors);
-
-	// Default middle gray texture, for use with shader defaults
-	sk_default_tex_gray = tex2d_create("default/tex2d_gray");
-	if (sk_default_tex_gray == nullptr) {
-		return false;
-	}
-	for (size_t i = 0; i < 2 * 2; i++) 
-		tex_colors[i] = { 128,128,128,255 };
-	tex2d_set_colors(sk_default_tex_gray, 2, 2, tex_colors);
-
-	// Default normal map, for use with shader defaults
-	sk_default_tex_flat = tex2d_create("default/tex2d_flat");
-	if (sk_default_tex_flat == nullptr) {
-		return false;
-	}
-	for (size_t i = 0; i < 2 * 2; i++) 
-		tex_colors[i] = { 128,128,255,255 };
-	tex2d_set_colors(sk_default_tex_flat, 2, 2, tex_colors);
-
-	sk_default_shader = shader_create("default/shader", sk_shader_builtin_default);
-	if (sk_default_shader == nullptr) {
-		return false;
-	}
-	sk_default_shader_pbr = shader_create("default/shader_pbr", sk_shader_builtin_pbr);
-	if (sk_default_shader_pbr == nullptr) {
-		return false;
-	}
-
-	sk_default_material = material_create("default/material", sk_default_shader);
-	if (sk_default_material == nullptr) {
-		return false;
-	}
-
-	material_set_texture(sk_default_material, "diffuse", sk_default_tex);
-
-	return true;
-}
-
-void sk_destroy_defaults() {
-	material_release(sk_default_material);
-	shader_release  (sk_default_shader_pbr);
-	shader_release  (sk_default_shader);
-	tex2d_release   (sk_default_tex);
-	tex2d_release   (sk_default_tex_black);
-	tex2d_release   (sk_default_tex_gray);
-	tex2d_release   (sk_default_tex_flat);
-}

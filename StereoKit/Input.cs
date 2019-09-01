@@ -59,6 +59,14 @@ namespace StereoKit
 
     [StructLayout(LayoutKind.Sequential)]
     public struct Hand {
+        [DllImport(NativeLib.DllName, CallingConvention = CallingConvention.Cdecl)]
+        static extern void input_hand_visible(Handed hand, int visible);
+        [DllImport(NativeLib.DllName, CallingConvention = CallingConvention.Cdecl)]
+        static extern void input_hand_solid(Handed hand, int solid);
+        [DllImport(NativeLib.DllName, CallingConvention = CallingConvention.Cdecl)]
+        static extern void input_hand_material(Handed hand, IntPtr material);
+
+
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 25)]
         public Pose[,] fingers;
         public Pose    wrist;
@@ -77,6 +85,10 @@ namespace StereoKit
         public bool IsTracked       { get { return (state & InputState.Tracked)     > 0; } }
         public bool IsJustTracked   { get { return (state & InputState.JustTracked) > 0; } }
         public bool IsJustUntracked { get { return (state & InputState.Untracked)   > 0; } }
+
+        public Material Material { set { input_hand_material(handedness, value._materialInst); } }
+        public bool     Visible  { set { input_hand_visible (handedness, value ? 1 : 0); } }
+        public bool     Solid    { set { input_hand_solid   (handedness, value ? 1 : 0); } }
     }
 
     public static class Input
@@ -99,6 +111,8 @@ namespace StereoKit
         static extern void input_fire_event(InputSource source, InputState evt, IntPtr pointer);
         [DllImport(NativeLib.DllName, CallingConvention = CallingConvention.Cdecl)]
         static extern void input_hand_visible(Handed hand, int visible);
+        [DllImport(NativeLib.DllName, CallingConvention = CallingConvention.Cdecl)]
+        static extern void input_hand_solid(Handed hand, int solid);
         [DllImport(NativeLib.DllName, CallingConvention = CallingConvention.Cdecl)]
         static extern void input_hand_material(Handed hand, IntPtr material);
         #endregion
@@ -128,6 +142,10 @@ namespace StereoKit
         public static void HandVisible(Handed hand, bool visible)
         {
             input_hand_visible(hand, visible?1:0);
+        }
+        public static void HandSolid(Handed hand, bool solid)
+        {
+            input_hand_solid(hand, solid ? 1 : 0);
         }
         public static void HandMaterial(Handed hand, Material material)
         {
