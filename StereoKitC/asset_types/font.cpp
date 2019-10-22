@@ -7,6 +7,8 @@
 
 #include <stdio.h>
 
+namespace sk {
+
 ///////////////////////////////////////////
 
 font_t font_find(const char *id) {
@@ -24,7 +26,8 @@ font_t font_create(const char *file) {
 	font_t result = font_find(file);
 	if (result != nullptr)
 		return result;
-	result = (font_t)assets_allocate(asset_type_font, file);
+	result = (font_t)assets_allocate(asset_type_font);
+	assets_set_id(result->header, file);
 
 	FILE *fp;
 	if (fopen_s(&fp, file, "rb") != 0 || fp == nullptr)
@@ -46,11 +49,11 @@ font_t font_create(const char *file) {
 	const int h = 512;
 	const float size = 64;
 	const int start_char = 32;
-	stbtt_fontinfo font;
+	//stbtt_fontinfo font;
 	uint8_t *bitmap;
 	stbtt_pack_context pc;
 	stbtt_packedchar chars[128];
-	stbtt_InitFont(&font, data, stbtt_GetFontOffsetForIndex(data,0));
+	//stbtt_InitFont(&font, data, stbtt_GetFontOffsetForIndex(data,0));
 	bitmap = (uint8_t*)malloc(sizeof(uint8_t) * w * h);
 	stbtt_PackBegin(&pc, (unsigned char*)(bitmap), w, h, 0, 1, NULL);
 	stbtt_PackFontRange(&pc, data, 0, size, start_char, 95, chars);
@@ -75,7 +78,7 @@ font_t font_create(const char *file) {
 	for (size_t i = 0; i < w*h; i++) {
 		colors[i] = color32{ bitmap[i], 0, 0, 0 };
 	}
-	result->font_tex = tex2d_create("fonttex", tex_type_image);
+	result->font_tex = tex2d_create(tex_type_image);
 	tex2d_set_colors(result->font_tex, w, h, colors);
 
 	free(bitmap);
@@ -87,14 +90,15 @@ font_t font_create(const char *file) {
 ///////////////////////////////////////////
 
 void font_release(font_t font) {
+	if (font == nullptr)
+		return;
 	assets_releaseref(font->header);
 }
 
 ///////////////////////////////////////////
 
 void font_destroy(font_t font) {
-	if (font->font_tex != nullptr)
-		tex2d_release(font->font_tex);
+	tex2d_release(font->font_tex);
 	*font = {};
 }
 
@@ -103,3 +107,5 @@ void font_destroy(font_t font) {
 tex2d_t font_get_tex(font_t font) {
 	return font->font_tex;
 }
+
+} // namespace sk

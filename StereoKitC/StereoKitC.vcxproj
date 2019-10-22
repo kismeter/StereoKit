@@ -1,14 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -26,19 +18,6 @@
     <ProjectName>StereoKitC</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -57,12 +36,6 @@
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -70,46 +43,18 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir)ReactPhysics\include;$(ProjectDir)OpenXR\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)ReactPhysics\bin\$(Platform)\$(Configuration);$(ProjectDir)OpenXR\bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(ProjectDir)ReactPhysics\include;$(ProjectDir)OpenXR\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)ReactPhysics\bin\$(Platform)\$(Configuration);$(ProjectDir)OpenXR\bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)ReactPhysics\include;$(ProjectDir)OpenXR\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)ReactPhysics\bin\$(Platform)\$(Configuration);$(ProjectDir)OpenXR\bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)lib\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)lib\bin\$(Platform)\$(Configuration);$(ProjectDir)lib\bin\$(Platform);$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intermediate\$(Platform)_$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)ReactPhysics\include;$(ProjectDir)OpenXR\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)ReactPhysics\bin\$(Platform)\$(Configuration);$(ProjectDir)OpenXR\bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)lib\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)lib\bin\$(Platform)\$(Configuration);$(ProjectDir)lib\bin\$(Platform);$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)bin\$(Platform)_$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intermediate\$(Platform)_$(Configuration)\</IntDir>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>true</ConformanceMode>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-    </Link>
-    <PostBuildEvent>
-      <Command>
-      </Command>
-    </PostBuildEvent>
-    <PostBuildEvent>
-      <Message>
-      </Message>
-    </PostBuildEvent>
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -122,32 +67,10 @@
       <SubSystem>Windows</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>
-      </Command>
-    </PostBuildEvent>
-    <PostBuildEvent>
-      <Message>
-      </Message>
-    </PostBuildEvent>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>true</ConformanceMode>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-    </Link>
-    <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>xcopy "$(ProjectDir)lib\bin\$(Platform)\*.dll" "$(TargetDir)" /d /k /y
+xcopy "$(TargetDir)*.dll" "$(SolutionDir)bin\distribute\bin\$(Platform)\" /d /k /y
+xcopy "$(TargetDir)*.lib" "$(SolutionDir)bin\distribute\bin\$(Platform)\" /d /k /y
+xcopy "$(ProjectDir)stereokit*.h" "$(SolutionDir)bin\distribute\include\" /d /k /y</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>
@@ -170,8 +93,10 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>xcopy "$(ProjectDir)lib\bin\$(Platform)\*.dll" "$(TargetDir)" /d /k /y
+xcopy "$(TargetDir)*.dll" "$(SolutionDir)bin\distribute\bin\$(Platform)\" /d /k /y
+xcopy "$(TargetDir)*.lib" "$(SolutionDir)bin\distribute\bin\$(Platform)\" /d /k /y
+xcopy "$(ProjectDir)stereokit*.h" "$(SolutionDir)bin\distribute\include\" /d /k /y</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>
@@ -185,27 +110,34 @@
     <ClCompile Include="asset_types\mesh.cpp" />
     <ClCompile Include="asset_types\model.cpp" />
     <ClCompile Include="asset_types\shader.cpp" />
+    <ClCompile Include="asset_types\sprite.cpp" />
     <ClCompile Include="asset_types\texture.cpp" />
     <ClCompile Include="camera.cpp" />
+    <ClCompile Include="libraries\stref.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="math.cpp" />
     <ClCompile Include="shaders_builtin\shader_builtin_default.cpp" />
     <ClCompile Include="shaders_builtin\shader_builtin_equirect.cpp" />
     <ClCompile Include="shaders_builtin\shader_builtin_font.cpp" />
+    <ClCompile Include="shaders_builtin\shader_builtin_lines.cpp" />
     <ClCompile Include="shaders_builtin\shader_builtin_pbr.cpp" />
     <ClCompile Include="shaders_builtin\shader_builtin_skybox.cpp" />
+    <ClCompile Include="shaders_builtin\shader_builtin_unlit.cpp" />
     <ClCompile Include="stereokit.cpp" />
-    <ClCompile Include="stref.cpp" />
+    <ClCompile Include="stereokit_ui.cpp" />
     <ClCompile Include="systems\d3d.cpp" />
     <ClCompile Include="systems\defaults.cpp" />
     <ClCompile Include="systems\input.cpp" />
     <ClCompile Include="systems\input_hand.cpp" />
+    <ClCompile Include="systems\input_leap.cpp" />
+    <ClCompile Include="systems\line_drawer.cpp" />
     <ClCompile Include="systems\physics.cpp" />
     <ClCompile Include="systems\platform\openxr.cpp" />
     <ClCompile Include="systems\platform\platform.cpp" />
     <ClCompile Include="systems\platform\win32.cpp" />
     <ClCompile Include="systems\platform\win32_input.cpp" />
     <ClCompile Include="systems\render.cpp" />
+    <ClCompile Include="systems\sprite_drawer.cpp" />
     <ClCompile Include="systems\system.cpp" />
     <ClCompile Include="systems\text.cpp" />
     <ClCompile Include="transform.cpp" />
@@ -217,25 +149,31 @@
     <ClInclude Include="asset_types\mesh.h" />
     <ClInclude Include="asset_types\model.h" />
     <ClInclude Include="asset_types\shader.h" />
+    <ClInclude Include="asset_types\sprite.h" />
     <ClInclude Include="asset_types\texture.h" />
     <ClInclude Include="libraries\cgltf.h" />
     <ClInclude Include="libraries\stb_image.h" />
     <ClInclude Include="libraries\stb_rect_pack.h" />
     <ClInclude Include="libraries\stb_truetype.h" />
+    <ClInclude Include="libraries\stref.h" />
+    <ClInclude Include="math.h" />
     <ClInclude Include="shaders_builtin\shader_builtin.h" />
     <ClInclude Include="stereokit.h" />
-    <ClInclude Include="stref.h" />
+    <ClInclude Include="stereokit_ui.h" />
     <ClInclude Include="systems\d3d.h" />
     <ClInclude Include="systems\defaults.h" />
     <ClInclude Include="systems\input.h" />
     <ClInclude Include="systems\input_hand.h" />
     <ClInclude Include="systems\input_hand_poses.h" />
+    <ClInclude Include="systems\input_leap.h" />
+    <ClInclude Include="systems\line_drawer.h" />
     <ClInclude Include="systems\physics.h" />
     <ClInclude Include="systems\platform\openxr.h" />
     <ClInclude Include="systems\platform\platform.h" />
     <ClInclude Include="systems\platform\win32.h" />
     <ClInclude Include="systems\platform\win32_input.h" />
     <ClInclude Include="systems\render.h" />
+    <ClInclude Include="systems\sprite_drawer.h" />
     <ClInclude Include="systems\system.h" />
     <ClInclude Include="systems\text.h" />
     <ClInclude Include="_stereokit.h" />

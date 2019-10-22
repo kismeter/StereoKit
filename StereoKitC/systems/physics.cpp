@@ -9,6 +9,8 @@ using namespace std;
 #include <reactphysics3d.h>
 using namespace reactphysics3d;
 
+namespace sk {
+
 ///////////////////////////////////////////
 
 struct solid_move_t {
@@ -52,7 +54,7 @@ void physics_shutdown() {
 
 void physics_update() {
 	// How many physics frames are we going to be calculating this time?
-	int frames = ceil((sk_timev - physics_sim_time) / physics_step);
+	int32_t frames = (int32_t)ceil((sk_timev - physics_sim_time) / physics_step);
 	if (frames <= 0)
 		return;
 
@@ -62,7 +64,7 @@ void physics_update() {
 		// Position
 		move.old_velocity  = move.body->getLinearVelocity();
 		Vector3       pos  = move.body->getTransform().getPosition();
-		Vector3       velocity = (move.dest - pos) / (physics_step * frames);
+		Vector3       velocity = (move.dest - pos) / (reactphysics3d::decimal)(physics_step * frames);
 		move.body->setLinearVelocity(velocity);
 		// Rotation
 		move.old_rot_velocity = move.body->getAngularVelocity();
@@ -73,14 +75,14 @@ void physics_update() {
 			Vector3 axis;
 			delta.getRotationAngleAxis(angle, axis);
 			if (!isnan(angle)) {
-				move.body->setAngularVelocity((angle / (physics_step * frames)) * axis.getUnit());
+				move.body->setAngularVelocity((angle / (reactphysics3d::decimal)(physics_step * frames)) * axis.getUnit());
 			}
 		}
 	}
 
 	// Sim physics!
 	while (physics_sim_time < sk_timev) {
-		physics_world->update(physics_step);
+		physics_world->update((reactphysics3d::decimal)physics_step);
 		physics_sim_time += physics_step;
 	}
 
@@ -103,6 +105,9 @@ solid_t solid_create(const vec3 &position, const quat &rotation, solid_type_ typ
 ///////////////////////////////////////////
 
 void solid_release(solid_t solid) {
+	if (solid == nullptr)
+		return;
+
 	RigidBody        *body  = (RigidBody*)solid;
 	const ProxyShape *shape = body->getProxyShapesList();
 	while (shape != nullptr) {
@@ -112,7 +117,7 @@ void solid_release(solid_t solid) {
 		if (name == CollisionShapeName::BOX || name == CollisionShapeName::SPHERE || name == CollisionShapeName::CAPSULE)
 			delete asset;
 		else
-			log_write(log_warning, "Haven't added support for all physics shapes yet!");
+			log_warn("Haven't added support for all physics shapes yet!");
 
 		shape = shape->getNext();
 	}
@@ -200,3 +205,5 @@ void solid_get_transform(const solid_t solid, transform_t &out_transform) {
 	memcpy(&out_transform._rotation, &solid_tr.getOrientation().x, sizeof(quat));
 	out_transform._dirty = true;
 }
+
+} // namespace sk

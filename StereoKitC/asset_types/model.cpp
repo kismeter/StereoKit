@@ -14,6 +14,8 @@
 #include <map>
 using namespace std;
 
+namespace sk {
+
 ///////////////////////////////////////////
 
 bool modelfmt_obj (model_t model, const char *filename);
@@ -21,9 +23,15 @@ bool modelfmt_gltf(model_t model, const char *filename);
 
 ///////////////////////////////////////////
 
-model_t model_create(const char *id) {
-	model_t result = (_model_t*)assets_allocate(asset_type_model, id);
+model_t model_create() {
+	model_t result = (_model_t*)assets_allocate(asset_type_model);
 	return result;
+}
+
+///////////////////////////////////////////
+
+void model_set_id(model_t model, const char *id) {
+	assets_set_id(model->header, id);
 }
 
 ///////////////////////////////////////////
@@ -39,15 +47,12 @@ model_t model_find(const char *id) {
 
 ///////////////////////////////////////////
 
-model_t model_create_mesh(const char *id, mesh_t mesh, material_t material) {
-	model_t result = model_find(id);
-	if (result != nullptr)
-		return result;
-	result = model_create(id);
+model_t model_create_mesh(mesh_t mesh, material_t material) {
+	model_t result = model_create();
 
-	result->subset_count = 1;
-	result->subsets = (model_subset_t*)malloc(sizeof(model_subset_t));
-	transform_initialize(result->subsets[0].offset);
+	result->subset_count        = 1;
+	result->subsets             = (model_subset_t*)malloc(sizeof(model_subset_t));
+	result->subsets[0].offset   = matrix_identity;
 	result->subsets[0].material = material;
 	assets_addref(result->subsets[0].material->header);
 
@@ -63,12 +68,13 @@ model_t model_create_file(const char *filename) {
 	model_t result = model_find(filename);
 	if (result != nullptr)
 		return result;
-	result = model_create(filename);
+	result = model_create();
+	model_set_id(result, filename);
 
 	if        (modelfmt_gltf(result, filename)) {
 	} else if (modelfmt_obj (result, filename)) {
 	} else {
-		log_writef(log_error, "Can't load %s! File not found, or invalid format.", filename);
+		log_errf("Can't load %s! File not found, or invalid format.", filename);
 	}
 
 	return result;
@@ -89,6 +95,8 @@ int32_t    model_subset_count(model_t model) {
 ///////////////////////////////////////////
 
 void model_release(model_t model) {
+	if (model == nullptr)
+		return;
 	assets_releaseref(model->header);
 }
 
@@ -184,13 +192,14 @@ bool modelfmt_obj(model_t model, const char *filename) {
 
 	model->subset_count = 1;
 	model->subsets = (model_subset_t*)malloc(sizeof(model_subset_t));
-	transform_initialize(model->subsets[0].offset);
+	model->subsets[0].offset   = matrix_identity;
 	model->subsets[0].material = (material_t)assets_find("default/material");
 	assets_addref(model->subsets[0].material->header);
 
 	char id[512];
 	sprintf_s(id, 512, "%s/mesh", filename);
-	model->subsets[0].mesh = mesh_create(id);
+	model->subsets[0].mesh = mesh_create();
+	mesh_set_id   (model->subsets[0].mesh, id);
 	mesh_set_verts(model->subsets[0].mesh, &verts[0], (int32_t)verts.size());
 	mesh_set_inds (model->subsets[0].mesh, &faces[0], (int32_t)faces.size());
 
@@ -261,7 +270,8 @@ mesh_t gltf_parsemesh(cgltf_mesh *mesh, const char *filename) {
 		}
 	}
 
-	result = mesh_create(id);
+	result = mesh_create();
+	mesh_set_id   (result, id);
 	mesh_set_verts(result, verts, vert_count);
 	mesh_set_inds (result, inds,  ind_count);
 	free(verts);
@@ -306,7 +316,8 @@ tex2d_t gltf_parsetexture(cgltf_data* data, cgltf_image *image, const char *file
 	if (image->buffer_view != nullptr) {
 		// If it's already a loaded buffer, like in a .glb
 		image->buffer_view->buffer->data;
-		result = tex2d_create_mem(id, image->buffer_view->buffer->data, image->buffer_view->buffer->size);
+		result = tex2d_create_mem(image->buffer_view->buffer->data, image->buffer_view->buffer->size);
+		tex2d_set_id(result, id);
 	} else if (image->uri != nullptr && strncmp(image->uri, "data:", 5) == 0) {
 		// If it's an image file encoded in a base64 string
 		void         *buffer = nullptr;
@@ -318,7 +329,8 @@ tex2d_t gltf_parsetexture(cgltf_data* data, cgltf_image *image, const char *file
 		cgltf_load_buffer_base64(&options, size, start, &buffer);
 
 		if (buffer != nullptr) {
-			result = tex2d_create_mem(id, buffer, size);
+			result = tex2d_create_mem(buffer, size);
+			tex2d_set_id(result, id);
 			free(buffer);
 		}
 	} else if (image->uri != nullptr && strstr(image->uri, "://") == nullptr) {
@@ -341,7 +353,8 @@ material_t gltf_parsematerial(cgltf_data *data, cgltf_material *material, const 
 	}
 
 	//result = material_create(id, (shader_t)assets_find("default/shader"));
-	result = material_create(id, shader_find("default/shader_pbr"));
+	result = material_create(shader_find("default/shader_pbr"));
+	material_set_id(result, id);
 	cgltf_texture *tex = nullptr;
 	if (material->has_pbr_metallic_roughness) {
 		tex = material->pbr_metallic_roughness.base_color_texture.texture;
@@ -408,10 +421,12 @@ bool modelfmt_gltf(model_t model, const char *filename) {
 		vec3 pos   = { n->translation[0], n->translation[1], n->translation[2] };
 		vec3 scale = { n->scale      [0], n->scale      [1], n->scale      [2] };
 		quat rot   = { n->rotation   [0], n->rotation   [1], n->rotation   [2], n->rotation[3] };
-		transform_set(model->subsets[curr_subset].offset, pos, scale, rot);
+		model->subsets[curr_subset].offset = matrix_trs(pos, rot, scale);
 
 		curr_subset += 1;
 	}
 	cgltf_free(data);
 	return true;
 }
+
+} // namespace sk

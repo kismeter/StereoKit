@@ -1,5 +1,4 @@
-#pragma comment(lib,"Shlwapi.lib")
-#pragma comment(lib,"openxr_loader-1_0.lib")
+#pragma comment(lib,"openxr_loader.lib")
 
 #include "openxr.h"
 
@@ -11,6 +10,7 @@
 #include "../../systems/input_hand.h"
 #include "../../asset_types/texture.h"
 
+#define XR_USE_PLATFORM_WIN32
 #define XR_USE_GRAPHICS_API_D3D11
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -20,6 +20,8 @@
 #include <vector>
 
 using namespace std;
+
+namespace sk {
 
 ///////////////////////////////////////////
 
@@ -80,16 +82,19 @@ inline bool openxr_loc_valid(XrSpaceLocation &loc) {
 bool openxr_init(const char *app_name) {
 	const char          *extensions[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
 	XrInstanceCreateInfo createInfo   = { XR_TYPE_INSTANCE_CREATE_INFO };
-	createInfo.enabledExtensionCount      = _countof(extensions);
-	createInfo.enabledExtensionNames      = extensions;
-	createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
-	strcpy_s(createInfo.applicationInfo.applicationName, 128, app_name);
+	createInfo.enabledExtensionCount = _countof(extensions);
+	createInfo.enabledExtensionNames = extensions;
+	createInfo.applicationInfo.applicationVersion = 1;
+	createInfo.applicationInfo.engineVersion      = SK_VERSION_ID;
+	createInfo.applicationInfo.apiVersion         = XR_CURRENT_API_VERSION;
+	strcpy_s(createInfo.applicationInfo.applicationName, app_name);
+	strcpy_s(createInfo.applicationInfo.engineName, "StereoKit");
 	xrCreateInstance(&createInfo, &xr_instance);
 
 	// Check if OpenXR is on this system, if this is null here, the user needs to install an
 	// OpenXR runtime and ensure it's active!
 	if (xr_instance == XR_NULL_HANDLE) {
-		log_write(log_info, "Couldn't create OpenXR instance, is OpenXR installed and set as the active runtime?");
+		log_info("Couldn't create OpenXR instance, is OpenXR installed and set as the active runtime?");
 		return false;
 	}
 
@@ -97,6 +102,12 @@ bool openxr_init(const char *app_name) {
 	XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
 	systemInfo.formFactor = app_config_form;
 	xrGetSystem(xr_instance, &systemInfo, &xr_system_id);
+
+	// OpenXR wants to ensure apps are using the correct LUID, so this must be called before xrCreateSession
+	// TODO: Figure out how to make sure we're using the correct LUID, and get it to the d3d device before initialization >.<
+	// see here for reference: https://github.com/microsoft/OpenXR-SDK-VisualStudio/blob/fce13c538839a7c1f185595d6490e8d227741356/samples/BasicXrApp/DxUtility.cpp#L22
+	XrGraphicsRequirementsD3D11KHR requirement = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR };
+	xrGetD3D11GraphicsRequirementsKHR(xr_instance, xr_system_id, &requirement);
 
 	// Check what blend mode is valid for this device (opaque vs transparent displays)
 	// We'll just take the first one available!
@@ -106,10 +117,25 @@ bool openxr_init(const char *app_name) {
 	blend_modes.resize(blend_count);
 	xrEnumerateEnvironmentBlendModes(xr_instance, xr_system_id, app_config_view, blend_count, &blend_count, blend_modes.data());
 	for (size_t i = 0; i < blend_count; i++) {
-		if (blend_modes[i] == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE || blend_modes[i] == XR_ENVIRONMENT_BLEND_MODE_OPAQUE) {
+		if (blend_modes[i] == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE || 
+			blend_modes[i] == XR_ENVIRONMENT_BLEND_MODE_OPAQUE || 
+			blend_modes[i] == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) {
 			xr_blend = blend_modes[i];
 			break;
 		}
+	}
+
+	// register dispay type with the system
+	switch (xr_blend) {
+	case XR_ENVIRONMENT_BLEND_MODE_OPAQUE: {
+		sk_info.display_type = display_opaque;
+	}break;
+	case XR_ENVIRONMENT_BLEND_MODE_ADDITIVE: {
+		sk_info.display_type = display_additive;
+	}break;
+	case XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND: {
+		sk_info.display_type = display_passthrough;
+	}break;
 	}
 
 	// A session represents this application's desire to display things! This is where we hook up our graphics API.
@@ -123,7 +149,7 @@ bool openxr_init(const char *app_name) {
 
 	// Unable to start a session, may not have an MR device attached or ready
 	if (xr_session == XR_NULL_HANDLE) {
-		log_write(log_info, "Couldn't create an OpenXR session, no MR device attached/ready?");
+		log_info("Couldn't create an OpenXR session, no MR device attached/ready?");
 		return false;
 	}
 
@@ -174,7 +200,8 @@ bool openxr_init(const char *app_name) {
 		for (uint32_t s = 0; s < surface_count; s++) {
 			char name[64];
 			sprintf_s(name, 64, "stereokit/system/rendertarget_%d_%d", i, s);
-			swapchain.surface_data[s] = tex2d_create(name, tex_type_rendertarget, tex_format_rgba32);
+			swapchain.surface_data[s] = tex2d_create(tex_type_rendertarget, tex_format_rgba32);
+			tex2d_set_id     (swapchain.surface_data[s], name);
 			tex2d_setsurface (swapchain.surface_data[s], swapchain.surface_images[s].texture);
 			tex2d_add_zbuffer(swapchain.surface_data[s]);
 		}
@@ -349,7 +376,7 @@ bool openxr_render_layer(XrTime predictedTime, vector<XrCompositionLayerProjecti
 
 		// Call the rendering callback with our view and swapchain info
 		tex2d_t target = xr_swapchains[i].surface_data[img_id];
-		tex2d_rtarget_clear(target, {0,0,0,0});
+		tex2d_rtarget_clear(target, sk_info.display_type == display_opaque ? color32{0,0,0,255} : color32{0, 0, 0, 0});
 		tex2d_rtarget_set_active(target);
 		D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(
 			(float)views[i].subImage.imageRect.offset.x, 
@@ -359,10 +386,12 @@ bool openxr_render_layer(XrTime predictedTime, vector<XrCompositionLayerProjecti
 		d3d_context->RSSetViewports(1, &viewport);
 
 		float xr_projection[16];
+		matrix xr_proj_m;
 		openxr_projection(views[i].fov, 0.1f, 50, xr_projection);
+		memcpy(&xr_proj_m, xr_projection, sizeof(float) * 16);
 		transform_t cam_transform;
 		transform_set(cam_transform, (vec3&)views[i].pose.position, vec3_one, (quat&)views[i].pose.orientation);
-		render_draw_matrix(xr_projection, cam_transform);
+		render_draw_matrix(xr_proj_m, cam_transform);
 
 		// And tell OpenXR we're done with rendering to this one!
 		XrSwapchainImageReleaseInfo release_info = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
@@ -414,35 +443,45 @@ void openxr_make_actions() {
 	XrPath profile_path;
 	XrPath pose_path  [2];
 	XrPath select_path[2];
-	XrPath grip_path[2];
-	xrStringToPath(xr_instance, "/user/hand/left/input/aim/pose",     &pose_path[0]);
-	xrStringToPath(xr_instance, "/user/hand/right/input/aim/pose",    &pose_path[1]);
-	xrStringToPath(xr_instance, "/user/hand/left/input/trigger/value",  &select_path[0]);
-	xrStringToPath(xr_instance, "/user/hand/right/input/trigger/value", &select_path[1]);
-	xrStringToPath(xr_instance, "/user/hand/left/input/squeeze/click",  &grip_path[0]);
-	xrStringToPath(xr_instance, "/user/hand/right/input/squeeze/click", &grip_path[1]);
-	
-	XrActionSuggestedBinding bindings[] = {
-		{ xr_input.poseAction,   pose_path[0]   },
-		{ xr_input.poseAction,   pose_path[1]   },
-		{ xr_input.selectAction, select_path[0] },
-		{ xr_input.selectAction, select_path[1] },
-		{ xr_input.gripAction,   grip_path[0]   },
-		{ xr_input.gripAction,   grip_path[1]   } };
-
-	
-	xrStringToPath(xr_instance, "/interaction_profiles/microsoft/motion_controller", &profile_path);
+	XrPath grip_path  [2];
+	xrStringToPath(xr_instance, "/user/hand/left/input/aim/pose",       &pose_path[0]);
+	xrStringToPath(xr_instance, "/user/hand/right/input/aim/pose",      &pose_path[1]);
 	XrInteractionProfileSuggestedBinding suggested_binds = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
-	suggested_binds.interactionProfile     = profile_path;
-	suggested_binds.suggestedBindings      = &bindings[0];
-	suggested_binds.countSuggestedBindings = _countof(bindings);
-	xrSuggestInteractionProfileBindings(xr_instance, &suggested_binds);
 
-	xrStringToPath(xr_instance, "/interaction_profiles/khr/simple_controller", &profile_path);
-	suggested_binds.interactionProfile     = profile_path;
-	suggested_binds.suggestedBindings      = &bindings[0];
-	suggested_binds.countSuggestedBindings = _countof(bindings);
-	xrSuggestInteractionProfileBindings(xr_instance, &suggested_binds);
+	// microsoft / motion_controller
+	{
+		xrStringToPath(xr_instance, "/user/hand/left/input/trigger/value",  &select_path[0]);
+		xrStringToPath(xr_instance, "/user/hand/right/input/trigger/value", &select_path[1]);
+		xrStringToPath(xr_instance, "/user/hand/left/input/squeeze/click",  &grip_path[0]);
+		xrStringToPath(xr_instance, "/user/hand/right/input/squeeze/click", &grip_path[1]);
+		XrActionSuggestedBinding bindings[] = {
+			{ xr_input.poseAction,   pose_path  [0] }, { xr_input.poseAction,   pose_path  [1] },
+			{ xr_input.selectAction, select_path[0] }, { xr_input.selectAction, select_path[1] },
+			{ xr_input.gripAction,   grip_path  [0] }, { xr_input.gripAction,   grip_path  [1] }
+		};
+
+		xrStringToPath(xr_instance, "/interaction_profiles/microsoft/motion_controller", &profile_path);
+		suggested_binds.interactionProfile     = profile_path;
+		suggested_binds.suggestedBindings      = &bindings[0];
+		suggested_binds.countSuggestedBindings = _countof(bindings);
+		xrSuggestInteractionProfileBindings(xr_instance, &suggested_binds);
+	}
+
+	// khr / simple_controller
+	{
+		xrStringToPath(xr_instance, "/user/hand/left/input/select/click",  &select_path[0]);
+		xrStringToPath(xr_instance, "/user/hand/right/input/select/click", &select_path[1]);
+		XrActionSuggestedBinding bindings[] = {
+			{ xr_input.poseAction,   pose_path  [0] }, { xr_input.poseAction,   pose_path  [1] },
+			{ xr_input.selectAction, select_path[0] }, { xr_input.selectAction, select_path[1] },
+		};
+
+		xrStringToPath(xr_instance, "/interaction_profiles/khr/simple_controller", &profile_path);
+		suggested_binds.interactionProfile     = profile_path;
+		suggested_binds.suggestedBindings      = &bindings[0];
+		suggested_binds.countSuggestedBindings = _countof(bindings);
+		xrSuggestInteractionProfileBindings(xr_instance, &suggested_binds);
+	}
 
 	// Create frames of reference for the pose actions
 	for (int32_t i = 0; i < 2; i++) {
@@ -565,3 +604,5 @@ void openxr_pose_to_pointer(XrPosef &pose, pointer_t *pointer) {
 	memcpy(&pointer->orientation, &pose.orientation, sizeof(quat));
 	pointer->ray.dir = pointer->orientation * vec3_forward;
 }
+
+} // namespace sk

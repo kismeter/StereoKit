@@ -2,8 +2,15 @@
 #include "input.h"
 #include "input_hand.h"
 
+#ifndef SK_NO_FLATSCREEN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include <vector>
 using namespace std;
+
+namespace sk {
 
 ///////////////////////////////////////////
 
@@ -15,6 +22,8 @@ struct input_event_t {
 
 vector<input_event_t> input_listeners;
 vector<pointer_t>     input_pointers;
+mouse_t               input_mouse_data = {};
+keyboard_t            input_key_data   = {};
 
 ///////////////////////////////////////////
 
@@ -100,6 +109,27 @@ void input_shutdown() {
 ///////////////////////////////////////////
 
 void input_update() {
+#ifndef SK_NO_FLATSCREEN
+	for (size_t i = 0; i < key_MAX; i++) {
+		input_key_data.keys[i] = button_make_state(
+			input_key_data.keys[i] & button_state_down,
+			GetKeyState(i) & 0x8000);
+	}
+#endif
+
 	input_hand_update();
 }
 
+///////////////////////////////////////////
+
+const mouse_t &input_mouse() {
+	return input_mouse_data;
+}
+
+///////////////////////////////////////////
+
+button_state_ input_key(key_ key) {
+	return (button_state_)input_key_data.keys[key];
+}
+
+} // namespace sk {

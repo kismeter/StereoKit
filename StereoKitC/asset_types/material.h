@@ -4,6 +4,8 @@
 #include "assets.h"
 #include "shader.h"
 
+namespace sk {
+
 struct _material_t {
 	asset_header_t    header;
 	shader_t          shader;
@@ -15,4 +17,7 @@ struct _material_t {
 	ID3D11RasterizerState *rasterizer_state;
 };
 
-void material_destroy(material_t material);
+void   material_destroy   (material_t material);
+size_t material_param_size(material_param_ type);
+
+} // namespace sk

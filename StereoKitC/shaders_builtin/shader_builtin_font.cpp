@@ -1,6 +1,7 @@
 #include "shader_builtin.h"
 
 const char* sk_shader_builtin_font = R"_(
+// [name] sk/font
 cbuffer GlobalBuffer : register(b0) {
 	float4x4 sk_view;
 	float4x4 sk_proj;
@@ -10,14 +11,18 @@ cbuffer GlobalBuffer : register(b0) {
 	float4   sk_camera_pos;
 	float4   sk_camera_dir;
 };
+struct Inst {
+	float4x4 world;
+	float4   color;
+};
 cbuffer TransformBuffer : register(b1) {
-	float4x4 sk_world[1];
+	Inst sk_inst[1];
 };
 TextureCube sk_cubemap : register(t11);
 SamplerState tex_cube_sampler;
 
 cbuffer ParamBuffer : register(b2) {
-	// [param] color color default{1,1,1,1}
+	// [param] color color {1,1,1,1}
 	float4 color;
 };
 struct vsIn {
@@ -39,10 +44,10 @@ SamplerState tex_sampler;
 
 psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn output;
-	float3 world = mul(float4(input.pos.xyz, 1), sk_world[id]).xyz;
+	float3 world = mul(float4(input.pos.xyz, 1), sk_inst[id].world).xyz;
 	output.pos   = mul(float4(world, 1), sk_viewproj);
 
-	output.normal = normalize(mul(float4(input.norm, 0), sk_world[id]).xyz);
+	output.normal = normalize(mul(float4(input.norm, 0), sk_inst[id].world).xyz);
 	output.uv     = input.uv;
 	output.color  = input.color * color;
 	return output;

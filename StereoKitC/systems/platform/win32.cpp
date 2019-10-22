@@ -14,13 +14,14 @@
 #include "../d3d.h"
 #include "../input.h"
 
+namespace sk {
+
 ///////////////////////////////////////////
 
 HWND             win32_window    = nullptr;
 tex2d_t          win32_target    = {};
 IDXGISwapChain1 *win32_swapchain = {};
-float            win32_scroll      = 0;
-float            win32_scroll_dest = 0;
+float            win32_scroll    = 0;
 
 // For managing window resizing
 bool win32_check_resize = true;
@@ -35,7 +36,7 @@ void win32_resize(int width, int height) {
 		return;
 	d3d_screen_width  = width;
 	d3d_screen_height = height;
-	log_writef(log_info, "Resized to: %d<~BLK>x<~clr>%d", width, height);
+	log_infof("Resized to: %d<~BLK>x<~clr>%d", width, height);
 
 	if (win32_swapchain != nullptr) {
 		tex2d_releasesurface(win32_target);
@@ -52,6 +53,8 @@ bool win32_init(const char *app_name) {
 	d3d_screen_width  = sk_settings.flatscreen_width;
 	d3d_screen_height = sk_settings.flatscreen_height;
 
+	sk_info.display_type = display_opaque;
+
 	MSG      msg     = {0};
 	WNDCLASS wc      = {0}; 
 	wc.lpfnWndProc = [](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -59,7 +62,7 @@ bool win32_init(const char *app_name) {
 		case WM_CLOSE:     sk_run     = false; PostQuitMessage(0); break;
 		case WM_SETFOCUS:  sk_focused = true;  break;
 		case WM_KILLFOCUS: sk_focused = false; break;
-		case WM_MOUSEWHEEL:win32_scroll_dest += (short)HIWORD(wParam); break;
+		case WM_MOUSEWHEEL:win32_scroll += (short)HIWORD(wParam); break;
 		case WM_SYSCOMMAND: {
 			// Has the user pressed the restore/'un-maximize' button?
 			// WM_SIZE happens -after- this event, and contains the new size.
@@ -119,7 +122,8 @@ bool win32_init(const char *app_name) {
 	ID3D11Texture2D *back_buffer;
 	win32_swapchain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
 
-	win32_target = tex2d_create("stereokit/system/rendertarget", tex_type_rendertarget);
+	win32_target = tex2d_create(tex_type_rendertarget);
+	tex2d_set_id     (win32_target, "stereokit/system/rendertarget");
 	tex2d_setsurface (win32_target, back_buffer);
 	tex2d_add_zbuffer(win32_target);
 
@@ -148,7 +152,6 @@ void win32_step_begin() {
 		TranslateMessage(&msg);
 		DispatchMessage (&msg);
 	}
-	win32_scroll = win32_scroll + (win32_scroll_dest - win32_scroll) * sk_timev_elapsedf * 8;
 	win32_input_update();
 }
 
@@ -172,5 +175,7 @@ void win32_step_end() {
 void win32_vsync() {
 	win32_swapchain->Present(1, 0);
 }
+
+} // namespace sk
 
 #endif // SK_NO_FLATSCREEN

@@ -5,6 +5,8 @@
 #include "../stereokit.h"
 #include "assets.h"
 
+namespace sk {
+
 struct _tex2d_t {
 	asset_header_t header;
 	tex_format_    format;
@@ -19,7 +21,7 @@ struct _tex2d_t {
 	tex2d_t                   depth_buffer;
 };
 
-tex2d_t     tex2d_create_mem(const char *id, void *data, size_t data_size);
+tex2d_t     tex2d_create_mem(void *data, size_t data_size);
 void        tex2d_set_active(tex2d_t texture, int slot);
 void        tex2d_destroy   (tex2d_t texture);
 DXGI_FORMAT tex2d_get_native_format(tex_format_ format);
@@ -32,3 +34,5 @@ bool tex2d_create_surface(tex2d_t texture, void **data, int32_t data_count);
 bool tex2d_create_views  (tex2d_t texture);
 
 bool tex2d_downsample(color32 *data, int32_t width, int32_t height, color32 **out_data, int32_t *out_width, int32_t *out_height);
+
+} // namespace sk

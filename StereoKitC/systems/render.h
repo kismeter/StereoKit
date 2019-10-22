@@ -2,6 +2,8 @@
 
 #include "../stereokit.h"
 
+namespace sk {
+
 struct render_stats_t {
 	int swaps_mesh;
 	int swaps_shader;
@@ -12,7 +14,7 @@ struct render_stats_t {
 
 void render_draw       ();
 void render_draw_from  (camera_t &cam, transform_t &cam_transform);
-void render_draw_matrix(const float *cam_matrix, transform_t &cam_transform);
+void render_draw_matrix(const matrix &cam_matrix, transform_t &cam_transform);
 void render_clear();
 
 bool render_initialize();
@@ -27,3 +29,5 @@ void render_set_shader  (shader_t   shader);
 void render_set_texture (tex2d_t    texture, int slot);
 void render_set_mesh    (mesh_t     mesh);
 void render_draw_item   (int count);
+
+} // namespace sk

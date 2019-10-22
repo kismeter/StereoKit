@@ -1,6 +1,7 @@
 #include "shader_builtin.h"
 
 const char* sk_shader_builtin_equirect = R"_(
+// [name] sk/blit/equirect_convert
 cbuffer GlobalBuffer : register(b0) {
 	float4x4 sk_view;
 	float4x4 sk_proj;
@@ -18,11 +19,11 @@ cbuffer TransformBuffer : register(b1) {
 };
 
 cbuffer ParamBuffer : register(b2) {
-	// [param] vector up default{0,1,0,0}
+	// [param] vector up {0,1,0,0}
 	float4 up;
-	// [param] vector right default{1,0,0,0}
+	// [param] vector right {1,0,0,0}
 	float4 right;
-	// [param] vector forward default{0,0,-1,0}
+	// [param] vector forward {0,0,-1,0}
 	float4 forward;
 };
 struct vsIn {

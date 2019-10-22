@@ -5,6 +5,8 @@
 
 #include <stdio.h>
 
+namespace sk {
+
 ///////////////////////////////////////////
 
 ID3D11InputLayout *vert_t_layout = nullptr;
@@ -23,10 +25,10 @@ void mesh_set_verts(mesh_t mesh, vert_t *vertices, int32_t vertex_count) {
 		D3D11_SUBRESOURCE_DATA vert_buff_data = { vertices };
 		CD3D11_BUFFER_DESC     vert_buff_desc(sizeof(vert_t) * vertex_count, D3D11_BIND_VERTEX_BUFFER);
 		if (FAILED(d3d_device->CreateBuffer(&vert_buff_desc, &vert_buff_data, &mesh->vert_buffer)))
-			log_write(log_error, "Failed to create vertex buffer");
+			log_err("mesh_set_verts: Failed to create vertex buffer");
 		DX11ResType(mesh->vert_buffer, "verts");
 	} else {
-		log_write(log_error, "We don't support dynamic meshes quite yet.");
+		log_err("mesh_set_verts: We don't support dynamic meshes quite yet.");
 	}
 }
 
@@ -39,16 +41,27 @@ void mesh_set_inds (mesh_t mesh, vind_t *indices,  int32_t index_count) {
 		mesh->ind_buffer = nullptr; 
 	}
 	mesh->ind_count = index_count;
+	mesh->ind_draw  = index_count;
 
 	if (mesh->ind_buffer == nullptr) {
 		D3D11_SUBRESOURCE_DATA ind_buff_data = { indices };
 		CD3D11_BUFFER_DESC     ind_buff_desc(sizeof(vind_t) * index_count, D3D11_BIND_INDEX_BUFFER);
 		if (FAILED(d3d_device->CreateBuffer(&ind_buff_desc, &ind_buff_data, &mesh->ind_buffer)))
-			log_write(log_error, "Failed to create index buffer");
+			log_err("mesh_set_inds: Failed to create index buffer");
 		DX11ResType(mesh->ind_buffer,  "inds");
 	} else {
-		log_write(log_error, "We don't support dynamic meshes quite yet.");
+		log_err("mesh_set_inds: We don't support dynamic meshes quite yet.");
 	}
+}
+
+///////////////////////////////////////////
+
+void mesh_set_draw_inds(mesh_t mesh, int32_t index_count) {
+	if (index_count > mesh->ind_count) {
+		index_count = mesh->ind_count;
+		log_warn("mesh_set_draw_inds: Can't render more indices than the mesh has! Capping...");
+	}
+	mesh->ind_draw  = index_count;
 }
 
 ///////////////////////////////////////////
@@ -64,14 +77,22 @@ mesh_t mesh_find(const char *id) {
 
 ///////////////////////////////////////////
 
-mesh_t mesh_create(const char *id) {
-	mesh_t result = (_mesh_t*)assets_allocate(asset_type_mesh, id);
+void mesh_set_id(mesh_t mesh, const char *id) {
+	assets_set_id(mesh->header, id);
+}
+
+///////////////////////////////////////////
+
+mesh_t mesh_create() {
+	mesh_t result = (_mesh_t*)assets_allocate(asset_type_mesh);
 	return result;
 }
 
 ///////////////////////////////////////////
 
 void mesh_release(mesh_t mesh) {
+	if (mesh == nullptr)
+		return;
 	assets_releaseref(mesh->header);
 }
 
@@ -104,13 +125,8 @@ void mesh_gen_cube_vert(int i, const vec3 &size, vec3 &pos, vec3 &norm, vec2 &uv
 
 ///////////////////////////////////////////
 
-mesh_t mesh_gen_cube(const char *id, vec3 dimensions, int32_t subdivisions) {
-	mesh_t result = (mesh_t)assets_find(id);
-	if (result != nullptr) {
-		assets_addref(result->header);
-		return result;
-	}
-	result = mesh_create(id);
+mesh_t mesh_gen_cube(vec3 dimensions, int32_t subdivisions) {
+	mesh_t result = mesh_create();
 
 	subdivisions = max(0,subdivisions) + 2;
 
@@ -175,20 +191,15 @@ mesh_t mesh_gen_cube(const char *id, vec3 dimensions, int32_t subdivisions) {
 	free(verts);
 	free(inds);
 
-	DX11ResName(result->ind_buffer,  "inds_gen_cube",  id);
-	DX11ResName(result->vert_buffer, "verts_gen_cube", id);
+	DX11ResType(result->ind_buffer,  "inds_gen_cube" );
+	DX11ResType(result->vert_buffer, "verts_gen_cube");
 	return result;
 }
 
 ///////////////////////////////////////////
 
-mesh_t mesh_gen_sphere(const char *id, float diameter, int32_t subdivisions) {
-	mesh_t result = (mesh_t)assets_find(id);
-	if (result != nullptr) {
-		assets_addref(result->header);
-		return result;
-	}
-	result = mesh_create(id);
+mesh_t mesh_gen_sphere(float diameter, int32_t subdivisions) {
+	mesh_t result = mesh_create();
 
 	subdivisions = max(0,subdivisions) + 2;
 
@@ -252,20 +263,15 @@ mesh_t mesh_gen_sphere(const char *id, float diameter, int32_t subdivisions) {
 	free(verts);
 	free(inds);
 
-	DX11ResName(result->ind_buffer,  "inds_gen_sphere",  id);
-	DX11ResName(result->vert_buffer, "verts_gen_sphere", id);
+	DX11ResType(result->ind_buffer,  "inds_gen_sphere" );
+	DX11ResType(result->vert_buffer, "verts_gen_sphere");
 	return result;
 }
 
 ///////////////////////////////////////////
 
-mesh_t mesh_gen_rounded_cube(const char *id, vec3 dimensions, float edge_radius, int32_t subdivisions) {
-	mesh_t result = (mesh_t)assets_find(id);
-	if (result != nullptr) {
-		assets_addref(result->header);
-		return result;
-	}
-	result = mesh_create(id);
+mesh_t mesh_gen_rounded_cube(vec3 dimensions, float edge_radius, int32_t subdivisions) {
+	mesh_t result = mesh_create();
 
 	subdivisions = max(0,subdivisions) + 2;
 	if (subdivisions % 2 == 1) // need an even number of subdivisions
@@ -350,7 +356,9 @@ mesh_t mesh_gen_rounded_cube(const char *id, vec3 dimensions, float edge_radius,
 	free(verts);
 	free(inds);
 
-	DX11ResName(result->ind_buffer,  "inds_gen_rndcube",  id);
-	DX11ResName(result->vert_buffer, "verts_gen_rndcube", id);
+	DX11ResType(result->ind_buffer,  "inds_gen_rndcube" );
+	DX11ResType(result->vert_buffer, "verts_gen_rndcube");
 	return result;
 }
+
+} // namespace sk

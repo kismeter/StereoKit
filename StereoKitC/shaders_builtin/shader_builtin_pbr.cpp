@@ -1,6 +1,6 @@
 #include "shader_builtin.h"
 
-const char* sk_shader_builtin_pbr = R"_(
+const char* sk_shader_builtin_pbr = R"_(// [name] sk/default_pbr
 cbuffer GlobalBuffer : register(b0) {
 	float4x4 sk_view;
 	float4x4 sk_proj;
@@ -10,20 +10,24 @@ cbuffer GlobalBuffer : register(b0) {
 	float4   sk_camera_pos;
 	float4   sk_camera_dir;
 };
+struct Inst {
+	float4x4 world;
+	float4   color;
+};
 cbuffer TransformBuffer : register(b1) {
-	float4x4 sk_world[1000];
+	Inst sk_inst[800];
 };
 TextureCube sk_cubemap : register(t11);
 SamplerState tex_cube_sampler;
 
 cbuffer ParamBuffer : register(b2) {
-	// [param] color color default{1,1,1,1}
+	// [param] color color {1,1,1,1}
 	float4 _color;
-	// [param] float metallic default 0
+	// [param] float metallic 0
 	float metallic;
-	// [param] float roughness default 1
+	// [param] float roughness 1
 	float roughness;
-	// [param] float tex_scale default 1
+	// [param] float tex_scale 1
 	float tex_scale;
 };
 struct vsIn {
@@ -72,17 +76,17 @@ float3 FresnelSchlick(float NdotV, float3 surfaceColor, float metalness);
 
 psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn output;
-	output.world = mul(float4(input.pos.xyz, 1), sk_world[id]).xyz;
-	output.pos = mul(float4(output.world, 1), sk_viewproj);
+	output.world = mul(float4(input.pos.xyz, 1), sk_inst[id].world).xyz;
+	output.pos   = mul(float4(output.world,  1), sk_viewproj);
 
-	output.normal = normalize(mul(float4(input.norm, 0), sk_world[id]).xyz);
-	output.uv = input.uv * tex_scale;
-	output.color = input.color;
+	output.normal = normalize(mul(float4(input.norm, 0), sk_inst[id].world).xyz);
+	output.uv     = input.uv * tex_scale;
+	output.color  = input.color * sk_inst[id].color.rgb * _color.rgb;
 	return output;
 }
 
 float4 ps(psIn input) : SV_TARGET{
-	float3 albedo      = sRGBToLinear(tex         .Sample(tex_sampler,       input.uv).rgb) * _color.rgb;
+	float3 albedo      = sRGBToLinear(tex         .Sample(tex_sampler,       input.uv).rgb) * input.color.rgb;
 	float3 emissive    = sRGBToLinear(tex_emission.Sample(tex_e_sampler,     input.uv).rgb);
 	float3 metal_rough = sRGBToLinear(tex_metal   .Sample(tex_metal_sampler, input.uv).rgb); // b is metallic, rough is g
 	float3 tex_norm    = (tex_normal.Sample(tex_normal_sampler,input.uv).xyz) * 2 - 1;
@@ -131,7 +135,7 @@ float4 ps(psIn input) : SV_TARGET{
 	// v is view direction, or direction from the surface to the camera
 	// h is the half vector, h = normalize(l + v)
 	float  D = DistributionGGX(normal, half_vec, rough);
-	float3 F = FresnelSchlick(NdotV, albedo, metal);
+	float3 F = FresnelSchlick(max(NdotV, 0), albedo, metal);
 	float  G = GeometrySmith(max(NdotL, 0), max(NdotV, 0), rough);
 	float3 specular =
 		(D * G * F)
